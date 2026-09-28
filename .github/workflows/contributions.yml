@@ -1,0 +1,139 @@
+# Contribution Chart Auto-Sync
+# ---------------------------------------------------------------------------
+# This workflow re-renders `assets/contributions.svg` from GitHub's own
+# contribution data (the exact levels shown on your profile page) every 6
+# hours, so the README chart always mirrors the real GitHub system.
+#
+# Place this file at:  .github/workflows/contributions.yml
+# ---------------------------------------------------------------------------
+name: Contribution Chart
+
+on:
+  schedule:
+    - cron: "0 */6 * * *"   # every 6 hours (UTC)
+  workflow_dispatch:         # + manual "Run workflow" button in Actions tab
+
+permissions:
+  contents: write
+
+concurrency:
+  group: contribution-chart
+  cancel-in-progress: true
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Generate contribution chart
+        run: |
+          mkdir -p assets
+          python3 - <<'PY'
+          import datetime, re, urllib.request
+
+          USER = "CathyKernel"
+          UA = ("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
+                "(KHTML, like Gecko) Chrome/126.0 Safari/537.36")
+          LEVEL_COLORS = ["#EBEDF0", "#B6E3FE", "#7DD3FC", "#38BDF8", "#0369A1"]
+          LABEL = "#64748B"
+          FONT = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif"
+          CELL, GAP = 11, 3
+          PITCH = CELL + GAP
+          X0, Y0 = 34, 22
+
+          req = urllib.request.Request(
+              f"https://github.com/users/{USER}/contributions",
+              headers={"User-Agent": UA, "Accept-Language": "en"})
+          with urllib.request.urlopen(req, timeout=30) as r:
+              page = r.read().decode("utf-8", "replace")
+
+          days = []
+          for tag in re.findall(r"<(?:td|rect)\b[^>]*data-date=[^>]*>", page):
+              dm = re.search(r'data-date="(\d{4}-\d{2}-\d{2})"', tag)
+              lm = re.search(r'data-level="(\d)"', tag)
+              if dm and lm:
+                  days.append((dm.group(1), int(lm.group(1))))
+          if not days:
+              raise RuntimeError("no contribution data found")
+
+          recs = sorted((datetime.date(*map(int, d.split("-"))), lvl) for d, lvl in days)
+
+          weeks = {}
+          for date, lvl in recs:
+              wd = (date.weekday() + 1) % 7
+              sunday = date - datetime.timedelta(days=wd)
+              weeks.setdefault(sunday, {})[wd] = (date, lvl)
+          sundays = sorted(weeks)
+          ncols = len(sundays)
+
+          width = X0 + ncols * PITCH + 6
+          height = Y0 + 7 * PITCH + 26
+          today = datetime.date.today().isoformat()
+
+          parts = [
+              f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" '
+              f'viewBox="0 0 {width} {height}" role="img" '
+              f'aria-label="Contribution activity of {USER}">',
+              f'<rect width="{width}" height="{height}" fill="none"/>',
+          ]
+
+          prev_month = None
+          for col, sunday in enumerate(sundays):
+              month = sunday.month if sunday.day <= 3 else (sunday + datetime.timedelta(days=6)).month
+              key = (sunday.year, month)
+              if sunday.day <= 7 and (prev_month is None or key != prev_month[0]):
+                  label = datetime.date(sunday.year, month, 1).strftime("%b")
+                  x = X0 + col * PITCH
+                  if x < width - 24:
+                      parts.append(
+                          f'<text x="{x}" y="13" font="600 10px {FONT}" fill="{LABEL}">{label}</text>')
+              if prev_month is None or key != prev_month[0]:
+                  prev_month = (key, col)
+
+          for row, dayname in ((1, "Mon"), (3, "Wed"), (5, "Fri")):
+              y = Y0 + row * PITCH + CELL - 2
+              parts.append(
+                  f'<text x="{X0 - 8}" y="{y}" text-anchor="end" '
+                  f'font="400 9px {FONT}" fill="{LABEL}">{dayname}</text>')
+
+          for col, sunday in enumerate(sundays):
+              for wd, (date, lvl) in weeks[sunday].items():
+                  x = X0 + col * PITCH
+                  y = Y0 + wd * PITCH
+                  parts.append(
+                      f'<rect x="{x}" y="{y}" width="{CELL}" height="{CELL}" rx="2.5" '
+                      f'fill="{LEVEL_COLORS[min(lvl, 4)]}"><title>{date}: '
+                      f'{"no" if lvl == 0 else ""} contributions (level {lvl})</title></rect>')
+
+          lx = width - 5 * PITCH - 96
+          ly = height - 15
+          parts.append(f'<text x="{lx}" y="{ly + 9}" font="400 9px {FONT}" fill="{LABEL}">Less</text>')
+          for i in range(5):
+              parts.append(
+                  f'<rect x="{lx + 28 + i * PITCH}" y="{ly}" width="{CELL}" height="{CELL}" '
+                  f'rx="2.5" fill="{LEVEL_COLORS[i]}"/>')
+          parts.append(
+              f'<text x="{lx + 28 + 5 * PITCH + 4}" y="{ly + 9}" '
+              f'font="400 9px {FONT}" fill="{LABEL}">More</text>')
+          parts.append(
+              f'<text x="2" y="{ly + 9}" font="400 9px {FONT}" fill="#94A3B8">'
+              f'github-synced &#183; updated {today}</text>')
+          parts.append("</svg>")
+
+          with open("assets/contributions.svg", "w") as f:
+              f.write("\n".join(parts))
+          print("chart generated")
+          PY
+
+      - name: Commit if changed
+        run: |
+          git config user.name "cathy-automation"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add assets/contributions.svg
+          if git diff --cached --quiet; then
+            echo "Chart already up to date."
+          else
+            git commit -m "chore: auto-refresh contribution chart [skip ci]"
+            git push
+          fi

@@ -5,6 +5,9 @@
   Notes for future maintenance:
   - Header, footer & contribution chart are SELF-HOSTED in this repo
     (assets/*.svg) — they always load and colors are fully controlled.
+  - The "?v=7" suffixes below are CACHE-BUSTERS: bump the number
+    (v=8, v=9 ...) whenever you replace an asset file, so every visitor's
+    browser immediately fetches the new version instead of a stale cache.
   - The typing animation is embedded INSIDE assets/header.svg (SMIL),
     on the starry-sky photo — no external typing service is used.
   - assets/contributions.svg is auto-regenerated from GitHub's own
@@ -18,7 +21,7 @@
 -->
 
 <div align="center">
-  <img src="assets/header.svg" alt="Hi, I'm Cathy — math · music · code, with a built-in typing animation" width="100%" />
+  <img src="assets/header.svg?v=7" alt="Hi, I'm Cathy — math · music · code, with a built-in typing animation" width="100%" />
 </div>
 
 ---
@@ -87,7 +90,7 @@ Hey! I'm **Cathy** — and yes, the *Kernel* in **CathyKernel** is deliberate: I
 
 **📈 Contribution rhythm — auto-synced from GitHub every 6 hours**
 
-<img src="assets/contributions.svg" alt="Cathy's contribution chart, synced with GitHub" />
+<img src="assets/contributions.svg?v=7" alt="Cathy's contribution chart, synced with GitHub" />
 
 </div>
 
@@ -109,5 +112,5 @@ Hey! I'm **Cathy** — and yes, the *Kernel* in **CathyKernel** is deliberate: I
 ---
 
 <div align="center">
-  <img src="assets/footer.svg" alt="ocean waves footer" width="100%" />
+  <img src="assets/footer.svg?v=7" alt="ocean waves footer" width="100%" />
 </div>

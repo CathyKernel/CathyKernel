@@ -5,7 +5,13 @@
 # hours, so the README chart always mirrors the real GitHub system.
 #
 # Timestamps use Pacific Time (America/Los_Angeles), NOT the runner's
-# system clock (runners are UTC).
+# system clock (runners are UTC) — DATE ONLY (no time of day).
+#
+# Auto-update guarantees:
+#   - schedule  : cron every 6 hours -> refreshes contribution levels
+#                 (status) and the PT date stamp whenever either changed
+#   - manual    : "Run workflow" button in the Actions tab
+#   - commit    : only when the chart content actually changed
 #
 # Place this file at:  .github/workflows/contributions.yml
 # ---------------------------------------------------------------------------
@@ -74,10 +80,9 @@ jobs:
 
           width = X0 + ncols * PITCH + 6
           height = Y0 + 7 * PITCH + 26
-          # freshness stamp in Pacific Time, independent of runner timezone
+          # freshness stamp in Pacific Time (date only), independent of runner timezone
           now_pt = datetime.datetime.now(PT)
-          hour = now_pt.strftime("%I").lstrip("0") or "12"
-          stamp = f"{now_pt:%b %d, %Y} \u00b7 {hour}:{now_pt:%M %p} PT"
+          stamp = f"{now_pt:%b %d, %Y} PT"
 
           parts = [
               f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" '

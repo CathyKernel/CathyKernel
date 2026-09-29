@@ -4,6 +4,9 @@
 # contribution data (the exact levels shown on your profile page) every 6
 # hours, so the README chart always mirrors the real GitHub system.
 #
+# Timestamps use Pacific Time (America/Los_Angeles), NOT the runner's
+# system clock (runners are UTC).
+#
 # Place this file at:  .github/workflows/contributions.yml
 # ---------------------------------------------------------------------------
 name: Contribution Chart
@@ -31,6 +34,7 @@ jobs:
           mkdir -p assets
           python3 - <<'PY'
           import datetime, re, urllib.request
+          from zoneinfo import ZoneInfo
 
           USER = "CathyKernel"
           UA = ("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
@@ -40,7 +44,8 @@ jobs:
           FONT = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif"
           CELL, GAP = 11, 3
           PITCH = CELL + GAP
-          X0, Y0 = 34, 22
+          X0, Y0 = 48, 22      # wide left gutter so Mon/Wed/Fri never clip
+          PT = ZoneInfo("America/Los_Angeles")   # California time, not runner time
 
           req = urllib.request.Request(
               f"https://github.com/users/{USER}/contributions",
@@ -69,7 +74,10 @@ jobs:
 
           width = X0 + ncols * PITCH + 6
           height = Y0 + 7 * PITCH + 26
-          today = datetime.date.today().isoformat()
+          # freshness stamp in Pacific Time, independent of runner timezone
+          now_pt = datetime.datetime.now(PT)
+          hour = now_pt.strftime("%I").lstrip("0") or "12"
+          stamp = f"{now_pt:%b %d, %Y} \u00b7 {hour}:{now_pt:%M %p} PT"
 
           parts = [
               f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" '
@@ -80,6 +88,9 @@ jobs:
 
           # month labels — at the week that CONTAINS the 1st of each month
           # (key = year & month of the week's Saturday, so year/month always agree)
+          # NOTE: explicit font-size/font-family attributes (NOT the `font`
+          # shorthand) — the shorthand renders inconsistently in some browsers
+          # and clipped label letters.
           prev_key = None
           last_label_col = -10
           for col, sunday in enumerate(sundays):
@@ -89,15 +100,18 @@ jobs:
                   x = X0 + col * PITCH
                   if col - last_label_col >= 2 and x < width - 26:
                       parts.append(
-                          f'<text x="{x}" y="13" font="600 10px {FONT}" fill="{LABEL}">{sat.strftime("%b")}</text>')
+                          f'<text x="{x}" y="13" font-size="10" font-family="{FONT}" '
+                          f'font-weight="600" fill="{LABEL}">{sat.strftime("%b")}</text>')
                       last_label_col = col
                   prev_key = key
 
+          # day-of-week labels (Mon / Wed / Fri) — anchored 10px left of the
+          # grid with a wide 38px gutter, so no letter ever clips at x=0
           for row, dayname in ((1, "Mon"), (3, "Wed"), (5, "Fri")):
               y = Y0 + row * PITCH + CELL - 2
               parts.append(
-                  f'<text x="{X0 - 8}" y="{y}" text-anchor="end" '
-                  f'font="400 10px {FONT}" fill="{LABEL}">{dayname}</text>')
+                  f'<text x="{X0 - 10}" y="{y}" text-anchor="end" '
+                  f'font-size="10" font-family="{FONT}" fill="{LABEL}">{dayname}</text>')
 
           for col, sunday in enumerate(sundays):
               for wd, (date, lvl) in weeks[sunday].items():
@@ -110,17 +124,18 @@ jobs:
 
           lx = width - 5 * PITCH - 96
           ly = height - 15
-          parts.append(f'<text x="{lx}" y="{ly + 9}" font="400 9px {FONT}" fill="{LABEL}">Less</text>')
+          parts.append(f'<text x="{lx}" y="{ly + 9}" font-size="9" font-family="{FONT}" fill="{LABEL}">Less</text>')
           for i in range(5):
               parts.append(
                   f'<rect x="{lx + 28 + i * PITCH}" y="{ly}" width="{CELL}" height="{CELL}" '
                   f'rx="2.5" fill="{LEVEL_COLORS[i]}"/>')
           parts.append(
               f'<text x="{lx + 28 + 5 * PITCH + 4}" y="{ly + 9}" '
-              f'font="400 9px {FONT}" fill="{LABEL}">More</text>')
+              f'font-size="9" font-family="{FONT}" fill="{LABEL}">More</text>')
+          # freshness stamp — bottom left, Pacific Time
           parts.append(
-              f'<text x="2" y="{ly + 9}" font="400 9px {FONT}" fill="#94A3B8">'
-              f'github-synced &#183; updated {today}</text>')
+              f'<text x="2" y="{ly + 9}" font-size="9" font-family="{FONT}" fill="#94A3B8">'
+              f'github-synced \u00b7 updated {stamp}</text>')
           parts.append("</svg>")
 
           with open("assets/contributions.svg", "w") as f:

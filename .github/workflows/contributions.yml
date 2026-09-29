@@ -78,24 +78,26 @@ jobs:
               f'<rect width="{width}" height="{height}" fill="none"/>',
           ]
 
-          prev_month = None
+          # month labels — at the week that CONTAINS the 1st of each month
+          # (key = year & month of the week's Saturday, so year/month always agree)
+          prev_key = None
+          last_label_col = -10
           for col, sunday in enumerate(sundays):
-              month = sunday.month if sunday.day <= 3 else (sunday + datetime.timedelta(days=6)).month
-              key = (sunday.year, month)
-              if sunday.day <= 7 and (prev_month is None or key != prev_month[0]):
-                  label = datetime.date(sunday.year, month, 1).strftime("%b")
+              sat = sunday + datetime.timedelta(days=6)
+              key = (sat.year, sat.month)
+              if key != prev_key:
                   x = X0 + col * PITCH
-                  if x < width - 24:
+                  if col - last_label_col >= 2 and x < width - 26:
                       parts.append(
-                          f'<text x="{x}" y="13" font="600 10px {FONT}" fill="{LABEL}">{label}</text>')
-              if prev_month is None or key != prev_month[0]:
-                  prev_month = (key, col)
+                          f'<text x="{x}" y="13" font="600 10px {FONT}" fill="{LABEL}">{sat.strftime("%b")}</text>')
+                      last_label_col = col
+                  prev_key = key
 
           for row, dayname in ((1, "Mon"), (3, "Wed"), (5, "Fri")):
               y = Y0 + row * PITCH + CELL - 2
               parts.append(
                   f'<text x="{X0 - 8}" y="{y}" text-anchor="end" '
-                  f'font="400 9px {FONT}" fill="{LABEL}">{dayname}</text>')
+                  f'font="400 10px {FONT}" fill="{LABEL}">{dayname}</text>')
 
           for col, sunday in enumerate(sundays):
               for wd, (date, lvl) in weeks[sunday].items():
